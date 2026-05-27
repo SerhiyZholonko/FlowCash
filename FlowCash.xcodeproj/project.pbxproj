@@ -6,13 +6,30 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		18C53E3F2FC42C35001D6874 /* FactoryKit in Frameworks */ = {isa = PBXBuildFile; productRef = 18C53E3E2FC42C35001D6874 /* FactoryKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		18C5CC8B2FC4173E00515310 /* FlowCash.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowCash.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		18FF52AC2FC61145001366C9 /* Exceptions for "FlowCash" folder in "FlowCash" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 18C5CC8A2FC4173E00515310 /* FlowCash */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		18C5CC8D2FC4173E00515310 /* FlowCash */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				18FF52AC2FC61145001366C9 /* Exceptions for "FlowCash" folder in "FlowCash" target */,
+			);
 			path = FlowCash;
 			sourceTree = "<group>";
 		};
@@ -23,16 +40,25 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				18C53E3F2FC42C35001D6874 /* FactoryKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		18C53E402FC48C01001D6874 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		18C5CC822FC4173E00515310 = {
 			isa = PBXGroup;
 			children = (
 				18C5CC8D2FC4173E00515310 /* FlowCash */,
+				18C53E402FC48C01001D6874 /* Frameworks */,
 				18C5CC8C2FC4173E00515310 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -65,6 +91,7 @@
 			);
 			name = FlowCash;
 			packageProductDependencies = (
+				18C53E3E2FC42C35001D6874 /* FactoryKit */,
 			);
 			productName = FlowCash;
 			productReference = 18C5CC8B2FC4173E00515310 /* FlowCash.app */;
@@ -94,6 +121,9 @@
 			);
 			mainGroup = 18C5CC822FC4173E00515310;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				18C53E3D2FC42C35001D6874 /* XCRemoteSwiftPackageReference "Factory" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 18C5CC8C2FC4173E00515310 /* Products */;
 			projectDirPath = "";
@@ -251,11 +281,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = FlowCash/FlowCash.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 4BBUSC332Y;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FlowCash/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SpendFlow;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -283,11 +316,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = FlowCash/FlowCash.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 4BBUSC332Y;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FlowCash/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SpendFlow;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -332,6 +368,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		18C53E3D2FC42C35001D6874 /* XCRemoteSwiftPackageReference "Factory" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/hmlongco/Factory";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		18C53E3E2FC42C35001D6874 /* FactoryKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 18C53E3D2FC42C35001D6874 /* XCRemoteSwiftPackageReference "Factory" */;
+			productName = FactoryKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 18C5CC832FC4173E00515310 /* Project object */;
 }
