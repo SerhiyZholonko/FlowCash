@@ -7,9 +7,9 @@ enum AccountType: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .cash: "Готівка"
-        case .card: "Картка"
-        case .savings: "Заощадження"
+        case .cash: L("Готівка")
+        case .card: L("Картка")
+        case .savings: L("Заощадження")
         }
     }
 

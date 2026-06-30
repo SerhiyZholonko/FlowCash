@@ -10,6 +10,8 @@ final class Account {
     var color: String = ""
     var icon: String = ""
     var order: Int = 0
+    @Relationship(deleteRule: .cascade)
+    var transactions: [Transaction]?
 
     var type: AccountType {
         get { AccountType(rawValue: typeValue) ?? .cash }

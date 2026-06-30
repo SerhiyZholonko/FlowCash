@@ -17,5 +17,7 @@ struct AppRootView: View {
 
 #Preview {
     AppRootView()
+        .environment(AccountSelection())
+        .environment(DeepLinkRouter())
         .injectMockStore()
 }

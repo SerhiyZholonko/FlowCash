@@ -6,8 +6,8 @@ enum TransactionType: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .income: "Дохід"
-        case .expense: "Витрата"
+        case .income: L("Дохід")
+        case .expense: L("Витрата")
         }
     }
 }

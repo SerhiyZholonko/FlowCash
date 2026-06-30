@@ -26,6 +26,8 @@ struct AddTransactionView: View {
         }
         .onAppear { viewModel.loadCategories() }
         .sheet(isPresented: $viewModel.isShowingNoteInput) { noteSheet }
+        .sheet(isPresented: $viewModel.isShowingDatePicker) { dateSheet }
+        .sheet(isPresented: $viewModel.isAddingCategory) { addCategorySheet }
         .alert("Помилка", isPresented: Binding(
             get: { viewModel.error != nil },
             set: { _ in viewModel.error = nil }
@@ -40,7 +42,7 @@ struct AddTransactionView: View {
 
     private var headerBar: some View {
         HStack {
-            Text(viewModel.selectedType == .expense ? "Нова витрата" : "Новий дохід")
+            Text(viewModel.selectedType == .expense ? L("Нова витрата") : L("Новий дохід"))
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(Color.textPrimary)
             Spacer()
@@ -84,14 +86,14 @@ struct AddTransactionView: View {
         HStack(spacing: 8) {
             chipButton(
                 icon: "mic",
-                label: viewModel.note.isEmpty ? "Нотатка" : viewModel.note
+                label: viewModel.note.isEmpty ? L("Нотатка") : viewModel.note
             ) {
                 viewModel.isShowingNoteInput = true
             }
 
             chipButton(
                 icon: "calendar",
-                label: viewModel.date.isToday ? "Сьогодні" : viewModel.date.shortFormatted
+                label: viewModel.date.isToday ? L("Сьогодні") : viewModel.date.shortFormatted
             ) {
                 viewModel.isShowingDatePicker.toggle()
             }
@@ -100,17 +102,6 @@ struct AddTransactionView: View {
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 16)
-        .overlay(alignment: .bottom) {
-            if viewModel.isShowingDatePicker {
-                DatePicker("", selection: $viewModel.date, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .tint(Color.accentPrimary)
-                    .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 14))
-                    .padding(.horizontal, 20)
-                    .offset(y: 220)
-                    .zIndex(10)
-            }
-        }
     }
 
     private func chipButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
@@ -134,19 +125,23 @@ struct AddTransactionView: View {
 
     private var categoryGrid: some View {
         let cols = Array(repeating: GridItem(.flexible(), spacing: 0), count: 4)
-        return LazyVGrid(columns: cols, spacing: 16) {
-            ForEach(viewModel.filteredCategories.prefix(7), id: \.id) { category in
-                categoryTile(category)
+        return ScrollView(.vertical, showsIndicators: false) {
+            LazyVGrid(columns: cols, spacing: 16) {
+                ForEach(viewModel.filteredCategories, id: \.id) { category in
+                    categoryTile(category)
+                }
+                addCategoryTile
             }
-            addCategoryTile
+            .padding(.horizontal, 20)
+            .padding(.vertical, 2)
         }
-        .padding(.horizontal, 20)
+        .frame(maxHeight: 180)
     }
 
     private func categoryTile(_ category: Category) -> some View {
         let isSelected = viewModel.selectedCategory?.id == category.id
         return Button {
-            viewModel.selectedCategory = isSelected ? nil : category
+            viewModel.selectedCategory = category
         } label: {
             VStack(spacing: 6) {
                 Circle()
@@ -175,19 +170,24 @@ struct AddTransactionView: View {
     }
 
     private var addCategoryTile: some View {
-        VStack(spacing: 6) {
-            Circle()
-                .strokeBorder(Color.borderSubtle, style: StrokeStyle(lineWidth: 2, dash: [4]))
-                .frame(width: 52, height: 52)
-                .overlay {
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(Color.textSecondary)
-                }
-            Text("Додати")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.textSecondary)
+        Button {
+            viewModel.isAddingCategory = true
+        } label: {
+            VStack(spacing: 6) {
+                Circle()
+                    .strokeBorder(Color.borderSubtle, style: StrokeStyle(lineWidth: 2, dash: [4]))
+                    .frame(width: 52, height: 52)
+                    .overlay {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                Text("Додати")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.textSecondary)
+            }
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Numpad
@@ -265,6 +265,124 @@ struct AddTransactionView: View {
         .padding(.bottom, 24)
     }
 
+    // MARK: - Add category sheet
+
+    private var addCategorySheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    categoryPreview
+
+                    TextField("Назва категорії", text: $viewModel.newCategoryName)
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.textPrimary)
+                        .padding(16)
+                        .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 12))
+
+                    Text("Колір")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.textSecondary)
+
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 16) {
+                        ForEach(viewModel.colorSwatches, id: \.self) { hex in
+                            Button {
+                                viewModel.newCategoryColor = hex
+                            } label: {
+                                Circle()
+                                    .fill(Color(hex: hex))
+                                    .frame(width: 44, height: 44)
+                                    .overlay {
+                                        if viewModel.newCategoryColor == hex {
+                                            Circle().stroke(Color.textPrimary, lineWidth: 2.5)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    Text("Іконка")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.textSecondary)
+
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 14) {
+                        ForEach(viewModel.iconOptions, id: \.self) { icon in
+                            Button {
+                                viewModel.newCategoryIcon = icon
+                            } label: {
+                                Image(systemName: icon)
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(viewModel.newCategoryIcon == icon ? .white : Color.textSecondary)
+                                    .frame(width: 44, height: 44)
+                                    .background(
+                                        viewModel.newCategoryIcon == icon ? Color.accentPrimary : Color.bgCard,
+                                        in: RoundedRectangle(cornerRadius: 10)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .background(Color.bgPrimary)
+            .navigationTitle("Нова категорія")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Скасувати") { viewModel.isAddingCategory = false }
+                        .foregroundStyle(Color.textSecondary)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Зберегти") { viewModel.addCategory() }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.accentPrimary)
+                        .disabled(viewModel.newCategoryName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private var categoryPreview: some View {
+        Circle()
+            .fill(Color(hex: viewModel.newCategoryColor))
+            .frame(width: 64, height: 64)
+            .overlay {
+                Image(systemName: viewModel.newCategoryIcon)
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Date sheet
+
+    private var dateSheet: some View {
+        NavigationStack {
+            VStack {
+                DatePicker("", selection: $viewModel.date, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .tint(Color.accentPrimary)
+                    .labelsHidden()
+                    .padding(.horizontal, 8)
+                Spacer()
+            }
+            .padding(20)
+            .background(Color.bgPrimary)
+            .navigationTitle("Дата")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Готово") { viewModel.isShowingDatePicker = false }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.accentPrimary)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
     // MARK: - Note sheet
 
     private var noteSheet: some View {
@@ -302,7 +420,7 @@ private extension Date {
 
     var shortFormatted: String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "uk_UA")
+        f.locale = LocalizationManager.shared.locale
         f.dateFormat = "d MMM"
         return f.string(from: self)
     }

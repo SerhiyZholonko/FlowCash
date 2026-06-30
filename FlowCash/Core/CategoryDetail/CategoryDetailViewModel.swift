@@ -12,6 +12,7 @@ struct MonthBar: Identifiable {
 @Observable
 final class CategoryDetailViewModel: ErrorDisplayable, AlertDisplayable {
     var transactions: [Transaction] = []
+    var editingTransaction: Transaction?
     var error: Error?
     var alert: AppAlert?
 
@@ -32,7 +33,7 @@ final class CategoryDetailViewModel: ErrorDisplayable, AlertDisplayable {
     var monthlyBars: [MonthBar] {
         let cal = Calendar.current
         let now = Date()
-        let locale = Locale(identifier: "uk_UA")
+        let locale = LocalizationManager.shared.locale
 
         return (0..<6).reversed().map { offset in
             guard let month = cal.date(byAdding: .month, value: -offset, to: now) else {
@@ -61,6 +62,18 @@ final class CategoryDetailViewModel: ErrorDisplayable, AlertDisplayable {
         Task(handlingError: self) { [weak self] in
             guard let self else { return }
             transactions = try await store.fetchTransactions()
+        }
+    }
+
+    func delete(_ transaction: Transaction) {
+        Task(handlingError: self) { [weak self] in
+            guard let self else { return }
+            // Відкочуємо вплив транзакції на баланс рахунку перед видаленням.
+            if let account = transaction.account {
+                account.balance -= transaction.signedAmount
+            }
+            try await store.delete(transaction)
+            transactions.removeAll { $0.id == transaction.id }
         }
     }
 }

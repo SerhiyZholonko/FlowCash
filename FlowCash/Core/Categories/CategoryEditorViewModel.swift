@@ -7,13 +7,30 @@ import FactoryKit
 final class CategoryEditorViewModel: ErrorDisplayable, AlertDisplayable {
     var categories: [Category] = []
     var newCategoryName: String = ""
+    var newCategoryType: TransactionType = .expense
     var selectedColor: String = "#f87171"
+    var selectedIcon: String = "tag"
     var error: Error?
     var alert: AppAlert?
+
+    var expenseCategories: [Category] {
+        categories.filter { $0.type == .expense }
+    }
+
+    var incomeCategories: [Category] {
+        categories.filter { $0.type == .income }
+    }
 
     let colorSwatches: [String] = [
         "#f87171", "#fb923c", "#fbbf24", "#c084fc",
         "#2dd4bf", "#818cf8", "#22d3ee", "#e879f9"
+    ]
+
+    let iconOptions: [String] = [
+        "fork.knife", "cup.and.saucer", "tram", "gamecontroller",
+        "heart", "house", "tshirt", "graduationcap",
+        "gift", "airplane", "antenna.radiowaves.left.and.right", "sparkles",
+        "figure.run", "cart", "banknote", "tag"
     ]
 
     @ObservationIgnored
@@ -42,9 +59,9 @@ final class CategoryEditorViewModel: ErrorDisplayable, AlertDisplayable {
         guard !name.isEmpty else { return }
         let newCategory = Category(
             name: name,
-            icon: "",
+            icon: selectedIcon,
             color: selectedColor,
-            type: .expense,
+            type: newCategoryType,
             order: categories.count
         )
         Task(handlingError: self) { [weak self] in
@@ -52,6 +69,7 @@ final class CategoryEditorViewModel: ErrorDisplayable, AlertDisplayable {
             try await store.add(newCategory)
             categories.append(newCategory)
             newCategoryName = ""
+            selectedIcon = "tag"
         }
     }
 

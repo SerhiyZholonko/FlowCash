@@ -5,7 +5,7 @@ struct MonthSelectorView: View {
 
     private var monthTitle: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "uk_UA")
+        formatter.locale = LocalizationManager.shared.locale
         formatter.dateFormat = "LLLL yyyy"
         return formatter.string(from: selectedDate).capitalized
     }

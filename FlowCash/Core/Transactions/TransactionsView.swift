@@ -1,32 +1,26 @@
 import SwiftUI
 
 struct TransactionsView: View {
-    @State private var viewModel = TransactionsViewModel()
+    @State private var viewModel: TransactionsViewModel
+
+    init(typeFilter: TransactionType? = nil) {
+        _viewModel = State(initialValue: TransactionsViewModel(typeFilter: typeFilter))
+    }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Group {
-                if viewModel.grouped.isEmpty && viewModel.searchText.isEmpty {
-                    emptyState
-                } else {
-                    transactionsList
-                }
+        Group {
+            if viewModel.grouped.isEmpty && viewModel.searchText.isEmpty {
+                emptyState
+            } else {
+                transactionsList
             }
-
-            addButton
         }
         .background(Color.bgPrimary)
-        .navigationTitle("Транзакції")
+        .navigationTitle(viewModel.navigationTitle)
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(Color.textSecondary)
-            }
-        }
         .searchable(
             text: $viewModel.searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
+            placement: .navigationBarDrawer(displayMode: .automatic),
             prompt: "Пошук транзакцій"
         )
         .sheet(isPresented: $viewModel.isAddingTransaction, onDismiss: { viewModel.loadData() }) {
@@ -108,7 +102,7 @@ struct TransactionsView: View {
                 }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(transaction.category?.name ?? "Без категорії")
+                Text(transaction.category?.name ?? L("Без категорії"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.textPrimary)
                 if !transaction.note.isEmpty {
@@ -137,27 +131,10 @@ struct TransactionsView: View {
             Text("Немає транзакцій")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color.textSecondary)
-            Text("Натисніть + щоб додати першу")
-                .font(.system(size: 13))
-                .foregroundStyle(Color.textSecondary.opacity(0.7))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - FAB
-
-    private var addButton: some View {
-        Button { viewModel.isAddingTransaction = true } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
-                .background(Color.accentPrimary, in: Circle())
-                .shadow(color: Color.accentPrimary.opacity(0.35), radius: 12, y: 4)
-        }
-        .padding(.trailing, 20)
-        .padding(.bottom, 24)
-    }
 }
 
 #Preview {

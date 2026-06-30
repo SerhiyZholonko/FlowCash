@@ -15,6 +15,25 @@ final class AddTransactionViewModel: ErrorDisplayable, AlertDisplayable {
     var isShowingDatePicker = false
     var isShowingNoteInput = false
 
+    var isAddingCategory = false
+    var newCategoryName = ""
+    var newCategoryColor = "#f87171"
+    var newCategoryIcon = "tag"
+
+    let colorSwatches: [String] = [
+        "#f87171", "#fb923c", "#fbbf24", "#c084fc",
+        "#2dd4bf", "#818cf8", "#22d3ee", "#e879f9"
+    ]
+
+    let iconOptions: [String] = [
+        "tag", "fork.knife", "cup.and.saucer", "cart", "bag", "tram",
+        "car", "fuelpump", "airplane", "house", "gamecontroller", "heart",
+        "pills", "tshirt", "graduationcap", "book", "gift", "sparkles",
+        "figure.run", "dumbbell", "pawprint", "phone", "wifi", "doc.text",
+        "creditcard", "banknote", "laptopcomputer", "music.note", "camera",
+        "leaf", "wrench.and.screwdriver", "ellipsis.circle"
+    ]
+
     init(defaultType: TransactionType = .expense) {
         self.selectedType = defaultType
     }
@@ -31,9 +50,11 @@ final class AddTransactionViewModel: ErrorDisplayable, AlertDisplayable {
 
     var saveButtonTitle: String {
         if let category = selectedCategory {
-            return "Зберегти у «\(category.name)»"
+            return L("Зберегти у «%@»", category.name)
         }
-        return selectedType == .expense ? "Зберегти витрату" : "Зберегти дохід"
+        return selectedType == .expense
+            ? L("Зберегти витрату")
+            : L("Зберегти дохід")
     }
 
     var filteredCategories: [Category] {
@@ -77,7 +98,32 @@ final class AddTransactionViewModel: ErrorDisplayable, AlertDisplayable {
         }
     }
 
+    func addCategory() {
+        let name = newCategoryName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        let category = Category(
+            name: name,
+            icon: newCategoryIcon,
+            color: newCategoryColor,
+            type: selectedType,
+            order: categories.count
+        )
+        Task(handlingError: self) { [weak self] in
+            guard let self else { return }
+            try await store.add(category)
+            categories.append(category)
+            selectedCategory = category
+            newCategoryName = ""
+            newCategoryColor = colorSwatches.first ?? "#f87171"
+            newCategoryIcon = iconOptions.first ?? "tag"
+            isAddingCategory = false
+        }
+    }
+
     func save() async throws {
+        let accounts = try await store.fetchAccounts()
+        let account = resolveSelectedAccount(accounts)
+
         let transaction = Transaction(
             amount: amountValue,
             type: selectedType,
@@ -85,7 +131,22 @@ final class AddTransactionViewModel: ErrorDisplayable, AlertDisplayable {
             date: date,
             note: note
         )
+        transaction.account = account
         try await store.add(transaction)
+
+        if let account {
+            account.balance += transaction.signedAmount
+            try await store.update(account)
+        }
+    }
+
+    private func resolveSelectedAccount(_ accounts: [Account]) -> Account? {
+        if let stored = UserDefaults.standard.string(forKey: AccountSelection.key),
+           let id = UUID(uuidString: stored),
+           let match = accounts.first(where: { $0.id == id }) {
+            return match
+        }
+        return accounts.first
     }
 }
 

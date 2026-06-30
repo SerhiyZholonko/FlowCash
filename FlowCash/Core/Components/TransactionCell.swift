@@ -7,7 +7,7 @@ struct TransactionCell: View {
         HStack(spacing: 12) {
             categoryIcon
             VStack(alignment: .leading, spacing: 3) {
-                Text(transaction.category?.name ?? "Без категорії")
+                Text(transaction.category?.name ?? L("Без категорії"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.textPrimary)
                 if !transaction.note.isEmpty {

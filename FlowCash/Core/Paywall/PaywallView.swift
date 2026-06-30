@@ -74,7 +74,7 @@ struct PaywallView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 20))
                         .foregroundStyle(Color.incomeGreen)
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(Color.textPrimary)
                 }
@@ -90,8 +90,8 @@ struct PaywallView: View {
 
     private var planPicker: some View {
         HStack(spacing: 12) {
-            planTile(plan: .yearly,  title: "Рік",    price: "₴749", period: "рік")
-            planTile(plan: .monthly, title: "Місяць", price: "₴99",  period: "міс")
+            planTile(plan: .yearly,  title: L("Рік"),    price: "₴749", period: L("рік"))
+            planTile(plan: .monthly, title: L("Місяць"), price: "₴99",  period: L("міс"))
         }
     }
 

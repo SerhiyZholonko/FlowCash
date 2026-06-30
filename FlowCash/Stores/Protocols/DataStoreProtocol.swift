@@ -21,4 +21,7 @@ protocol DataStoreProtocol: AnyObject {
     func add(_ budget: Budget) async throws
     func update(_ budget: Budget) async throws
     func delete(_ budget: Budget) async throws
+
+    /// Повне видалення всіх даних (для Debug-скидання). Видалення синхронізується в iCloud.
+    func deleteAllData() async throws
 }

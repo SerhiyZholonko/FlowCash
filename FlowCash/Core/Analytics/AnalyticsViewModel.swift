@@ -8,11 +8,24 @@ enum StatsPeriod: String, CaseIterable {
     case all   = "Все"
 }
 
+enum StatsKind: String, CaseIterable {
+    case expense = "Витрати"
+    case income  = "Доходи"
+
+    var transactionType: TransactionType {
+        switch self {
+        case .expense: .expense
+        case .income:  .income
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class StatsViewModel: ErrorDisplayable, AlertDisplayable {
     var allTransactions: [Transaction] = []
     var selectedPeriod: StatsPeriod = .month
+    var selectedKind: StatsKind = .expense
     var error: Error?
     var alert: AppAlert?
 
@@ -39,16 +52,17 @@ final class StatsViewModel: ErrorDisplayable, AlertDisplayable {
         }
     }
 
-    var expensesByCategory: [CategoryStat] {
+    /// Категорії за обраним типом (витрати або доходи) для donut і списку.
+    var categoryStats: [CategoryStat] {
         Dictionary(
-            grouping: transactions.filter { $0.type == .expense },
+            grouping: transactions.filter { $0.type == selectedKind.transactionType },
             by: { $0.category?.id ?? UUID() }
         )
         .compactMap { _, group -> CategoryStat? in
             guard let first = group.first else { return nil }
             let total = group.reduce(0) { $0 + $1.amount }
             return CategoryStat(
-                name: first.category?.name ?? "Інше",
+                name: first.category?.name ?? L("Інше"),
                 color: first.category?.color ?? "#cbd5e1",
                 icon: first.category?.icon ?? "ellipsis.circle",
                 total: total
@@ -57,11 +71,25 @@ final class StatsViewModel: ErrorDisplayable, AlertDisplayable {
         .sorted { $0.total > $1.total }
     }
 
+    var totalIncome: Double {
+        transactions.filter { $0.type == .income }.reduce(0) { $0 + $1.amount }
+    }
+
     var totalExpense: Double {
         transactions.filter { $0.type == .expense }.reduce(0) { $0 + $1.amount }
     }
 
-    var totalExpenseForPercent: Double { totalExpense > 0 ? totalExpense : 1 }
+    var totalBalance: Double { totalIncome - totalExpense }
+
+    /// Сума за обраним типом (для центру donut).
+    var selectedTotal: Double {
+        switch selectedKind {
+        case .expense: totalExpense
+        case .income:  totalIncome
+        }
+    }
+
+    var selectedTotalForPercent: Double { selectedTotal > 0 ? selectedTotal : 1 }
 
     func loadData() {
         Task(handlingError: self) { [weak self] in

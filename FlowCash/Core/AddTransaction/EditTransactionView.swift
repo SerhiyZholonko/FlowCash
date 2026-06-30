@@ -3,6 +3,7 @@ import SwiftUI
 struct EditTransactionView: View {
     @State private var viewModel: EditTransactionViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showDeleteConfirm = false
     var onSaved: () -> Void
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
@@ -20,6 +21,7 @@ struct EditTransactionView: View {
                     typeCard
                     categoryCard
                     detailsCard
+                    deleteButton
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -33,6 +35,22 @@ struct EditTransactionView: View {
                     Button("Скасувати") { dismiss() }
                         .font(.system(size: 16))
                         .foregroundStyle(Color.textSecondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .tint(Color.expenseRed)
+                    .confirmationDialog(
+                        "Видалити транзакцію?",
+                        isPresented: $showDeleteConfirm,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Видалити", role: .destructive) { performDelete() }
+                        Button("Скасувати", role: .cancel) {}
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Зберегти") {
@@ -49,6 +67,9 @@ struct EditTransactionView: View {
                 }
             }
             .onAppear { viewModel.loadCategories() }
+            .onChange(of: viewModel.selectedType) { _, _ in
+                viewModel.typeChanged()
+            }
             .alert("Помилка", isPresented: Binding(
                 get: { viewModel.error != nil },
                 set: { _ in viewModel.error = nil }
@@ -56,6 +77,35 @@ struct EditTransactionView: View {
                 Button("OK") { viewModel.error = nil }
             } message: {
                 Text(viewModel.error?.localizedDescription ?? "")
+            }
+        }
+    }
+
+    // MARK: - Delete
+
+    private var deleteButton: some View {
+        Button(role: .destructive) {
+            showDeleteConfirm = true
+        } label: {
+            Label("Видалити транзакцію", systemImage: "trash")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.expenseRed)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(Color.expenseRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func performDelete() {
+        Task { [weak viewModel] in
+            guard let viewModel else { return }
+            do {
+                try await viewModel.delete()
+                onSaved()
+                dismiss()
+            } catch {
+                viewModel.error = error
             }
         }
     }
@@ -111,7 +161,7 @@ struct EditTransactionView: View {
                     .foregroundStyle(Color.textSecondary)
             } else {
                 LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(viewModel.categories, id: \.id) { category in
+                    ForEach(viewModel.filteredCategories, id: \.id) { category in
                         categoryTile(category)
                     }
                 }
@@ -125,7 +175,7 @@ struct EditTransactionView: View {
     private func categoryTile(_ category: Category) -> some View {
         let isSelected = viewModel.selectedCategory?.id == category.id
         return Button {
-            viewModel.selectedCategory = isSelected ? nil : category
+            viewModel.selectedCategory = category
         } label: {
             VStack(spacing: 6) {
                 Circle()
@@ -176,7 +226,7 @@ struct EditTransactionView: View {
         .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
     }
 
-    private func sectionLabel(_ text: String) -> some View {
+    private func sectionLabel(_ text: LocalizedStringKey) -> some View {
         Text(text)
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(Color.textSecondary)

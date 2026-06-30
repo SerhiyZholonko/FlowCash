@@ -3,7 +3,9 @@ import Charts
 
 enum HomeRoute: Hashable {
     case transactions
+    case income
     case stats
+    case accounts
     case budgets
     case settings
     case category(CategoryStat)
@@ -12,6 +14,12 @@ enum HomeRoute: Hashable {
 struct HomeView: View {
     @State private var viewModel = HomeViewModel()
     @State private var path: [HomeRoute] = []
+    @Environment(AccountSelection.self) private var accountSelection
+    @Environment(DeepLinkRouter.self) private var deepLink
+
+    private var selectedAccount: Account? {
+        accountSelection.resolve(in: viewModel.accounts)
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -19,6 +27,7 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         headerRow
+                        accountSelector
                         donutSection
                         statsRow
                         topExpensesSection
@@ -35,7 +44,9 @@ struct HomeView: View {
             .navigationDestination(for: HomeRoute.self) { route in
                 switch route {
                 case .transactions:       TransactionsView()
+                case .income:             TransactionsView(typeFilter: .income)
                 case .stats:              StatsView()
+                case .accounts:           AccountsView()
                 case .budgets:            BudgetsView()
                 case .settings:           SettingsView()
                 case .category(let stat): CategoryDetailView(stat: stat)
@@ -43,7 +54,30 @@ struct HomeView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear { viewModel.loadData() }
+        .overlay {
+            if viewModel.isLoading {
+                SplashView()
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.35), value: viewModel.isLoading)
+        .onAppear {
+            viewModel.preferredAccountId = accountSelection.selectedId
+            viewModel.loadData()
+            handlePendingAdd()
+        }
+        .onChange(of: accountSelection.selectedId) { _, newId in
+            viewModel.preferredAccountId = newId
+            viewModel.writeWidgetSnapshot()
+        }
+        .onChange(of: path) { _, newPath in
+            // Повернулися на корінь (напр. після видалення рахунку в AccountsView) —
+            // перезавантажуємо дані, щоб головна не показувала видалений рахунок.
+            if newPath.isEmpty { viewModel.loadData() }
+        }
+        .onChange(of: deepLink.pendingAdd) { _, _ in
+            handlePendingAdd()
+        }
         .sheet(isPresented: $viewModel.isAddingExpense, onDismiss: { viewModel.loadData() }) {
             AddTransactionView(defaultType: .expense) { viewModel.loadData() }
         }
@@ -58,6 +92,52 @@ struct HomeView: View {
         } message: {
             Text(viewModel.error?.localizedDescription ?? "")
         }
+    }
+
+    // MARK: - Account selector
+
+    private var accountSelector: some View {
+        Menu {
+            ForEach(viewModel.accounts, id: \.id) { account in
+                Button {
+                    accountSelection.selectedId = account.id
+                } label: {
+                    if selectedAccount?.id == account.id {
+                        Label(account.name, systemImage: "checkmark")
+                    } else {
+                        Text(account.name)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: selectedAccount?.icon ?? "creditcard")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 42, height: 42)
+                    .background(Color(hex: selectedAccount?.color ?? "#3b82f6"), in: Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(selectedAccount?.name ?? L("Немає рахунків"))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.textPrimary)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    Text((selectedAccount?.balance ?? 0).formattedCurrency)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(Color.textPrimary)
+                }
+                Spacer()
+            }
+            .padding(14)
+            .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.1), radius: 8, y: 2)
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.accounts.isEmpty)
     }
 
     // MARK: - Header
@@ -98,10 +178,11 @@ struct HomeView: View {
                 .disabled(isCurrentMonth)
 
                 Button { path.append(.settings) } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Color.textSecondary)
-                        .frame(width: 32, height: 32)
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Color.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(Color.bgCard, in: Circle())
                 }
             }
         }
@@ -169,19 +250,19 @@ struct HomeView: View {
 
     private var statsRow: some View {
         HStack(spacing: 12) {
-            Button { path.append(.stats) } label: {
-                statCard(dot: Color.incomeGreen, label: "ДОХІД", value: viewModel.totalIncome.formattedCurrency)
+            Button { path.append(.income) } label: {
+                statCard(dot: Color.incomeGreen, label: "ДОХІД МІСЯЦЯ", value: viewModel.totalIncome.formattedCurrency)
             }
             .buttonStyle(.plain)
 
-            Button { path.append(.budgets) } label: {
-                statCard(dot: Color.accentPrimary, label: "БАЛАНС", value: viewModel.totalBalance.formattedCurrency)
+            Button { path.append(.accounts) } label: {
+                statCard(dot: Color.accentPrimary, label: "БАЛАНС МІСЯЦЯ", value: viewModel.totalBalance.formattedCurrency)
             }
             .buttonStyle(.plain)
         }
     }
 
-    private func statCard(dot: Color, label: String, value: String) -> some View {
+    private func statCard(dot: Color, label: LocalizedStringKey, value: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Circle().fill(dot).frame(width: 8, height: 8)
@@ -280,12 +361,21 @@ struct HomeView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Action buttons
 
     private var actionButtons: some View {
         HStack(spacing: 12) {
+            Button { viewModel.isAddingIncome = true } label: {
+                Label("Дохід", systemImage: "plus")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(Color.incomeGreen, in: Capsule())
+            }
             Button { viewModel.isAddingExpense = true } label: {
                 Label("Витрата", systemImage: "minus")
                     .font(.system(size: 16, weight: .semibold))
@@ -295,14 +385,7 @@ struct HomeView: View {
                     .background(Color.expenseRed, in: Capsule())
             }
 
-            Button { viewModel.isAddingIncome = true } label: {
-                Label("Дохід", systemImage: "plus")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(Color.incomeGreen, in: Capsule())
-            }
+         
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 24)
@@ -317,7 +400,7 @@ struct HomeView: View {
 
     private var monthTitle: String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "uk_UA")
+        f.locale = LocalizationManager.shared.locale
         f.dateFormat = "LLLL yyyy"
         return f.string(from: viewModel.selectedMonth).capitalized
     }
@@ -325,9 +408,22 @@ struct HomeView: View {
     private var isCurrentMonth: Bool {
         Calendar.current.isDate(viewModel.selectedMonth, equalTo: Date(), toGranularity: .month)
     }
+
+    // MARK: - Deep link
+
+    private func handlePendingAdd() {
+        guard let type = deepLink.pendingAdd else { return }
+        switch type {
+        case .income:  viewModel.isAddingIncome = true
+        case .expense: viewModel.isAddingExpense = true
+        }
+        deepLink.pendingAdd = nil
+    }
 }
 
 #Preview {
     HomeView()
+        .environment(AccountSelection())
+        .environment(DeepLinkRouter())
         .injectMockStore()
 }

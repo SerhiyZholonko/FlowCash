@@ -8,7 +8,7 @@ extension Double {
         formatter.maximumFractionDigits = 0
         formatter.minimumFractionDigits = 0
         let number = formatter.string(from: NSNumber(value: self)) ?? "\(Int(self))"
-        return "\(number) ₴"
+        return "\(number) \(Currency.selected.symbol)"
     }
 
     var formattedAmount: String {
@@ -27,6 +27,6 @@ extension Double {
         formatter.groupingSeparator = " "
         formatter.maximumFractionDigits = 0
         let number = formatter.string(from: NSNumber(value: abs)) ?? "\(Int(abs))"
-        return "\(sign)₴\(number)"
+        return "\(sign)\(Currency.selected.symbol)\(number)"
     }
 }

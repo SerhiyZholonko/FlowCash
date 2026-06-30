@@ -125,6 +125,7 @@ final class MockDataStore: DataStoreProtocol {
     }
 
     func delete(_ account: Account) async throws {
+        transactions.removeAll { $0.account?.id == account.id }
         accounts.removeAll { $0.id == account.id }
     }
 
@@ -144,5 +145,14 @@ final class MockDataStore: DataStoreProtocol {
 
     func delete(_ budget: Budget) async throws {
         budgets.removeAll { $0.id == budget.id }
+    }
+
+    // MARK: - Bulk
+
+    func deleteAllData() async throws {
+        transactions.removeAll()
+        categories.removeAll()
+        accounts.removeAll()
+        budgets.removeAll()
     }
 }

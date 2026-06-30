@@ -23,13 +23,32 @@ final class TransactionsViewModel: ErrorDisplayable, AlertDisplayable {
     var error: Error?
     var alert: AppAlert?
 
+    /// Якщо задано — показуємо лише транзакції цього типу (напр. лише доходи).
+    let typeFilter: TransactionType?
+
     @ObservationIgnored
     @Injected(\.dataStore) private var store
 
+    init(typeFilter: TransactionType? = nil) {
+        self.typeFilter = typeFilter
+    }
+
+    var navigationTitle: String {
+        switch typeFilter {
+        case .income:  L("Доходи")
+        case .expense: L("Витрати")
+        case nil:      L("Транзакції")
+        }
+    }
+
     var filtered: [Transaction] {
-        guard !searchText.isEmpty else { return allTransactions }
+        var result = allTransactions
+        if let typeFilter {
+            result = result.filter { $0.type == typeFilter }
+        }
+        guard !searchText.isEmpty else { return result }
         let q = searchText.lowercased()
-        return allTransactions.filter { t in
+        return result.filter { t in
             t.note.lowercased().contains(q) ||
             (t.category?.name.lowercased().contains(q) ?? false)
         }
@@ -62,6 +81,10 @@ final class TransactionsViewModel: ErrorDisplayable, AlertDisplayable {
     func delete(_ transaction: Transaction) {
         Task(handlingError: self) { [weak self] in
             guard let self else { return }
+            // Відкочуємо вплив транзакції на баланс рахунку перед видаленням.
+            if let account = transaction.account {
+                account.balance -= transaction.signedAmount
+            }
             try await store.delete(transaction)
             allTransactions.removeAll { $0.id == transaction.id }
         }
@@ -69,10 +92,10 @@ final class TransactionsViewModel: ErrorDisplayable, AlertDisplayable {
 
     private func dayTitle(for date: Date) -> String {
         let cal = Calendar.current
-        if cal.isDateInToday(date) { return "Сьогодні" }
-        if cal.isDateInYesterday(date) { return "Вчора" }
+        if cal.isDateInToday(date) { return L("Сьогодні") }
+        if cal.isDateInYesterday(date) { return L("Вчора") }
         let f = DateFormatter()
-        f.locale = Locale(identifier: "uk_UA")
+        f.locale = LocalizationManager.shared.locale
         f.dateFormat = "d MMMM"
         return f.string(from: date)
     }

@@ -2,6 +2,13 @@
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
 
+# Claude Code
+.claude/
+CLAUDE.local.md
+
+# Claude-generated тимчасові файли
+.claude-*
+
 ## User settings
 xcuserdata/
 

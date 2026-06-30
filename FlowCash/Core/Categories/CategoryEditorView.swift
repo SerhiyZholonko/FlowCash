@@ -3,18 +3,27 @@ import SwiftUI
 struct CategoryEditorView: View {
     @State private var viewModel = CategoryEditorViewModel()
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var isNameFocused: Bool
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 18), count: 4)
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                hintLabel
-                categoryGrid
-                newCategoryCard
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    hintLabel
+                    categorySection(title: L("Витрати"), categories: viewModel.expenseCategories)
+                    categorySection(title: L("Дохід"), categories: viewModel.incomeCategories)
+                    newCategoryCard
+                        .id("newCategory")
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 32)
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 32)
+            .onChange(of: isNameFocused) { _, focused in
+                guard focused else { return }
+                withAnimation { proxy.scrollTo("newCategory", anchor: .top) }
+            }
         }
         .background(Color.bgPrimary)
         .navigationTitle("Категорії")
@@ -48,12 +57,24 @@ struct CategoryEditorView: View {
 
     // MARK: - Category grid
 
-    private var categoryGrid: some View {
-        LazyVGrid(columns: columns, spacing: 18) {
-            ForEach(viewModel.categories, id: \.id) { category in
-                categoryTile(category)
+    private func categorySection(title: String, categories: [Category]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title.uppercased())
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color.textPrimary)
+                .tracking(0.6)
+
+            if categories.isEmpty {
+                Text("Поки немає категорій")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.textSecondary)
+            } else {
+                LazyVGrid(columns: columns, spacing: 18) {
+                    ForEach(categories, id: \.id) { category in
+                        categoryTile(category)
+                    }
+                }
             }
-            addTile
         }
     }
 
@@ -91,22 +112,6 @@ struct CategoryEditorView: View {
         }
     }
 
-    private var addTile: some View {
-        VStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 26)
-                .stroke(Color.borderSubtle, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
-                .frame(width: 52, height: 52)
-                .overlay {
-                    Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Color.textSecondary)
-                }
-            Text("Додати")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.textSecondary)
-        }
-    }
-
     // MARK: - New category card
 
     private var newCategoryCard: some View {
@@ -115,13 +120,24 @@ struct CategoryEditorView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.textPrimary)
 
+            typePicker
+
             TextField("Назва категорії", text: $viewModel.newCategoryName)
                 .font(.system(size: 14))
                 .foregroundStyle(Color.textPrimary)
+                .focused($isNameFocused)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
                 .background(Color.bgPrimary, in: RoundedRectangle(cornerRadius: 10))
 
+            Text("Іконка")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.textSecondary)
+            iconSwatchRow
+
+            Text("Колір")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.textSecondary)
             colorSwatchRow
 
             Button(action: viewModel.addCategory) {
@@ -144,6 +160,14 @@ struct CategoryEditorView: View {
         .shadow(color: .black.opacity(0.1), radius: 8, y: 2)
     }
 
+    private var typePicker: some View {
+        Picker("Тип", selection: $viewModel.newCategoryType) {
+            Text("Витрати").tag(TransactionType.expense)
+            Text("Дохід").tag(TransactionType.income)
+        }
+        .pickerStyle(.segmented)
+    }
+
     private var colorSwatchRow: some View {
         HStack(spacing: 8) {
             ForEach(viewModel.colorSwatches, id: \.self) { hex in
@@ -163,6 +187,32 @@ struct CategoryEditorView: View {
                     }
             }
             Spacer()
+        }
+    }
+
+    private var iconSwatchRow: some View {
+        LazyVGrid(columns: columns, spacing: 12) {
+            ForEach(viewModel.iconOptions, id: \.self) { icon in
+                let isSelected = viewModel.selectedIcon == icon
+                Circle()
+                    .fill(Color.bgPrimary)
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        Image(systemName: icon)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(isSelected ? Color.accentPrimary : Color.textSecondary)
+                    }
+                    .overlay {
+                        if isSelected {
+                            Circle()
+                                .stroke(Color.textPrimary, lineWidth: 2.5)
+                                .padding(1.5)
+                        }
+                    }
+                    .onTapGesture {
+                        viewModel.selectedIcon = icon
+                    }
+            }
         }
     }
 }

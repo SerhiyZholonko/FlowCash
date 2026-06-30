@@ -98,4 +98,31 @@ final class SwiftDataStore: DataStoreProtocol {
         context.delete(budget)
         try context.save()
     }
+
+    // MARK: - Bulk
+
+    func deleteAllData() async throws {
+        // Видаляємо кожен об'єкт окремо, а не через context.delete(model:):
+        // batch-видалення обходить контекст і не пропагується в CloudKit,
+        // тож об'єкти «поверталися» б назад.
+        for transaction in try context.fetch(FetchDescriptor<Transaction>()) {
+            context.delete(transaction)
+        }
+        for category in try context.fetch(FetchDescriptor<Category>()) {
+            context.delete(category)
+        }
+        for account in try context.fetch(FetchDescriptor<Account>()) {
+            context.delete(account)
+        }
+        for budget in try context.fetch(FetchDescriptor<Budget>()) {
+            context.delete(budget)
+        }
+
+        // Категорії потрібні для роботи застосунку — одразу відновлюємо дефолтний набір.
+        for category in Category.defaultCategories() {
+            context.insert(category)
+        }
+
+        try context.save()
+    }
 }

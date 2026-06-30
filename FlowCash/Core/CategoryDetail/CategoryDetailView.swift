@@ -29,6 +29,9 @@ struct CategoryDetailView: View {
             }
         }
         .onAppear { viewModel.loadData() }
+        .sheet(item: $viewModel.editingTransaction, onDismiss: { viewModel.loadData() }) { transaction in
+            EditTransactionView(transaction: transaction) { viewModel.loadData() }
+        }
         .alert("Помилка", isPresented: Binding(
             get: { viewModel.error != nil },
             set: { _ in viewModel.error = nil }
@@ -128,13 +131,22 @@ struct CategoryDetailView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .contentShape(Rectangle())
+        .onTapGesture { viewModel.editingTransaction = t }
+        .contextMenu {
+            Button(role: .destructive) {
+                viewModel.delete(t)
+            } label: {
+                Label("Видалити", systemImage: "trash")
+            }
+        }
     }
 }
 
 private extension Date {
     var transactionFormatted: String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "uk_UA")
+        f.locale = LocalizationManager.shared.locale
         f.dateFormat = "d MMMM"
         return f.string(from: self)
     }

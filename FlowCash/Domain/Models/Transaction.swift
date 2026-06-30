@@ -8,12 +8,19 @@ final class Transaction {
     var typeValue: String = "expense"
     @Relationship(deleteRule: .nullify, inverse: \Category.transactions)
     var category: Category?
+    @Relationship(deleteRule: .nullify, inverse: \Account.transactions)
+    var account: Account?
     var date: Date = Date()
     var note: String = ""
 
     var type: TransactionType {
         get { TransactionType(rawValue: typeValue) ?? .expense }
         set { typeValue = newValue.rawValue }
+    }
+
+    /// Вплив транзакції на баланс рахунку: дохід додає, витрата віднімає.
+    var signedAmount: Double {
+        type == .income ? amount : -amount
     }
 
     init(

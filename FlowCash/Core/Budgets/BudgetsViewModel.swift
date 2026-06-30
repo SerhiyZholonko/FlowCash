@@ -26,8 +26,8 @@ enum BudgetStatus {
     var label: String {
         switch self {
         case .ok: return ""
-        case .nearLimit: return "Близько до ліміту"
-        case .exceeded: return "Перевищено"
+        case .nearLimit: return L("Близько до ліміту")
+        case .exceeded: return L("Перевищено")
         }
     }
 

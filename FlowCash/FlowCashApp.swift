@@ -6,17 +6,41 @@ struct FlowCashApp: App {
     static let modelContainer: ModelContainer = makeContainer()
 
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("hasSeedCompleted") private var hasSeedCompleted = false
+
+    @State private var lock = AppLockManager()
+    @State private var accountSelection = AccountSelection()
+    @State private var deepLink = DeepLinkRouter()
+    @State private var localization = LocalizationManager.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
-            if hasCompletedOnboarding {
-                AppRootView()
-                    .task { await seedCategoriesIfNeeded() }
-            } else {
-                OnboardingView()
+            Group {
+                if hasCompletedOnboarding {
+                    AppRootView()
+                        .task { await bootstrap() }
+                } else {
+                    OnboardingView()
+                }
             }
+            .environment(lock)
+            .environment(accountSelection)
+            .environment(deepLink)
+            .environment(localization)
+            .onOpenURL { deepLink.handle($0) }
+            .overlay {
+                if lock.isLocked {
+                    LockScreenView(onUnlock: { await lock.unlock() })
+                }
+            }
+            .environment(\.locale, localization.locale)
+            .id(localization.language)
         }
         .modelContainer(Self.modelContainer)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { lock.lockIfNeeded() }
+        }
     }
 
     // MARK: - Container
@@ -24,15 +48,26 @@ struct FlowCashApp: App {
     private static func makeContainer() -> ModelContainer {
         let schema = Schema([Transaction.self, Category.self, Account.self, Budget.self])
 
-        let cloudConfig = ModelConfiguration(
-            schema: schema,
-            cloudKitDatabase: .private("iCloud.com.zholonko.www.ToDoList.FlowCash")
-        )
-        if let container = try? ModelContainer(for: schema, configurations: cloudConfig) {
-            return container
+        // Користувацький перемикач синхронізації (Налаштування). За замовчуванням — увімкнено.
+        // Контейнер фіксується на старті, тож зміна перемикача діє лише після перезапуску.
+        let syncEnabled = UserDefaults.standard.object(forKey: "iCloudSyncEnabled") as? Bool ?? true
+
+        if syncEnabled {
+            let cloudConfig = ModelConfiguration(
+                schema: schema,
+                cloudKitDatabase: .private("iCloud.com.zholonko.www.ToDoList.FlowCash")
+            )
+            if let container = try? ModelContainer(for: schema, configurations: cloudConfig) {
+                return container
+            }
+            print("⚠️ CloudKit unavailable, falling back to local store")
         }
 
-        print("⚠️ CloudKit unavailable, falling back to local store")
+        return makeLocalContainer(schema: schema)
+    }
+
+    /// Локальне сховище без CloudKit — fallback або коли синхронізацію вимкнено користувачем.
+    private static func makeLocalContainer(schema: Schema) -> ModelContainer {
         let storeURL = URL.applicationSupportDirectory.appending(path: "SpendFlow.store")
         let localConfig = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
         do {
@@ -44,69 +79,133 @@ struct FlowCashApp: App {
         }
     }
 
-    // MARK: - Seed
+    // MARK: - Bootstrap
 
     @MainActor
-    private func seedCategoriesIfNeeded() async {
-        let context = Self.modelContainer.mainContext
-        let catDescriptor = FetchDescriptor<Category>()
-        guard let catCount = try? context.fetchCount(catDescriptor), catCount == 0 else {
-            await seedAccountsIfNeeded()
-            return
-        }
+    private func bootstrap() async {
+        await seedIfNeeded()
+        Self.deduplicate()
+        Self.migrateOrphanTransactions()
+        await observeRemoteChanges()
+    }
 
-        let expenseCategories: [(String, String, String, Int)] = [
-            ("Їжа",       "fork.knife",                        "#f87171", 0),
-            ("Кафе",      "cup.and.saucer",                    "#fb923c", 1),
-            ("Транспорт", "tram",                              "#fbbf24", 2),
-            ("Розваги",   "gamecontroller",                    "#c084fc", 3),
-            ("Здоров'я",  "heart",                             "#f472b6", 4),
-            ("Дім",       "house",                             "#2dd4bf", 5),
-            ("Одяг",      "tshirt",                            "#818cf8", 6),
-            ("Освіта",    "graduationcap",                     "#60a5fa", 7),
-            ("Подарунки", "gift",                              "#fb7185", 8),
-            ("Подорожі",  "airplane",                          "#34d399", 9),
-            ("Зв'язок",   "antenna.radiowaves.left.and.right", "#22d3ee", 10),
-            ("Краса",     "sparkles",                          "#e879f9", 11),
-            ("Спорт",     "figure.run",                        "#a3e635", 12),
-            ("Рахунки",   "doc.text",                          "#94a3b8", 13),
-            ("Інше",      "ellipsis.circle",                   "#cbd5e1", 14)
-        ]
-        for (name, icon, color, order) in expenseCategories {
-            context.insert(Category(name: name, icon: icon, color: color, type: .expense, order: order))
-        }
+    /// Транзакції, створені до прив'язки до рахунків (account == nil),
+    /// прив'язуємо до першого рахунку — інакше вони не показуються в жодному.
+    @MainActor
+    static func migrateOrphanTransactions() {
+        let context = modelContainer.mainContext
+        let accountDescriptor = FetchDescriptor<Account>(sortBy: [SortDescriptor(\.order)])
+        guard let firstAccount = try? context.fetch(accountDescriptor).first else { return }
+        guard let transactions = try? context.fetch(FetchDescriptor<Transaction>()) else { return }
 
-        let incomeCategories: [(String, String, String, Int)] = [
-            ("Зарплата",  "banknote",        "#22c55e", 15),
-            ("Фріланс",   "laptopcomputer",  "#3b82f6", 16),
-            ("Подарунок", "gift.fill",       "#fb7185", 17),
-            ("Оренда",    "house.fill",      "#2dd4bf", 18),
-            ("Стипендія", "graduationcap",   "#60a5fa", 19),
-            ("Продаж",    "cart",            "#fb923c", 20),
-            ("Інше",      "ellipsis.circle", "#cbd5e1", 21)
-        ]
-        for (name, icon, color, order) in incomeCategories {
-            context.insert(Category(name: name, icon: icon, color: color, type: .income, order: order))
+        var changed = false
+        for transaction in transactions where transaction.account == nil {
+            transaction.account = firstAccount
+            changed = true
         }
+        if changed { try? context.save() }
+    }
 
-        try? context.save()
-        await seedAccountsIfNeeded()
+    /// CloudKit може доставити дублі вже після старту — переганяємо дедуп
+    /// на кожну віддалену зміну сховища. Якщо дублів немає, виклик no-op.
+    @MainActor
+    private func observeRemoteChanges() async {
+        let changes = NotificationCenter.default.notifications(
+            named: Notification.Name("NSPersistentStoreRemoteChangeNotification")
+        )
+        for await _ in changes {
+            Self.deduplicate()
+        }
+    }
+
+    // MARK: - Deduplication
+
+    /// Прибирає дублі категорій/рахунків, що виникають через гонку seed на
+    /// кількох пристроях (CloudKit зливає незалежно засіяні набори).
+    @MainActor
+    static func deduplicate() {
+        let context = modelContainer.mainContext
+        deduplicateCategories(in: context)
+        deduplicateAccounts(in: context)
+        if context.hasChanges {
+            try? context.save()
+        }
     }
 
     @MainActor
-    private func seedAccountsIfNeeded() async {
-        let context = Self.modelContainer.mainContext
-        let descriptor = FetchDescriptor<Account>()
-        guard let count = try? context.fetchCount(descriptor), count == 0 else { return }
+    private static func deduplicateCategories(in context: ModelContext) {
+        guard let categories = try? context.fetch(FetchDescriptor<Category>()) else { return }
+        // Натуральний ключ: тип + назва. Переможець — найменший id (детерміновано
+        // на всіх пристроях), тож усі сходяться до того самого запису.
+        let groups = Dictionary(grouping: categories) { "\($0.typeValue)|\($0.name)" }
+        for group in groups.values where group.count > 1 {
+            let sorted = group.sorted { $0.id.uuidString < $1.id.uuidString }
+            guard let keeper = sorted.first else { continue }
+            for duplicate in sorted.dropFirst() {
+                for transaction in duplicate.transactions ?? [] {
+                    transaction.category = keeper
+                }
+                context.delete(duplicate)
+            }
+        }
+    }
 
+    @MainActor
+    private static func deduplicateAccounts(in context: ModelContext) {
+        guard let accounts = try? context.fetch(FetchDescriptor<Account>()) else { return }
+        let groups = Dictionary(grouping: accounts) { $0.name }
+        for group in groups.values where group.count > 1 {
+            let sorted = group.sorted { $0.id.uuidString < $1.id.uuidString }
+            for duplicate in sorted.dropFirst() {
+                context.delete(duplicate)
+            }
+        }
+    }
+
+    // MARK: - Seed
+
+    @MainActor
+    private func seedIfNeeded() async {
+        guard !hasSeedCompleted else { return }
+        let context = Self.modelContainer.mainContext
+
+        let categoriesExist = ((try? context.fetchCount(FetchDescriptor<Category>())) ?? 0) > 0
+        let accountsExist = ((try? context.fetchCount(FetchDescriptor<Account>())) ?? 0) > 0
+
+        // Дані вже є (локально чи з CloudKit) — це існуючий користувач.
+        // Нічого не сіємо, лише фіксуємо, що seed більше не потрібен. Інакше
+        // після видалення всіх рахунків заглушки повертались би на кожен запуск.
+        guard !categoriesExist && !accountsExist else {
+            hasSeedCompleted = true
+            return
+        }
+
+        seedDefaultCategories(into: context)
+        seedDefaultAccounts(into: context)
+        try? context.save()
+        hasSeedCompleted = true
+    }
+
+    @MainActor
+    private func seedDefaultCategories(into context: ModelContext) {
+        for category in Category.defaultCategories() {
+            context.insert(category)
+        }
+    }
+
+    @MainActor
+    private func seedDefaultAccounts(into context: ModelContext) {
         let accounts: [(String, AccountType, Double, String, String, Int)] = [
             ("Готівка",           .cash,    8240,  "#22c55e", "banknote",   0),
             ("Картка ПриватБанк", .card,    32000, "#3b82f6", "creditcard", 1),
             ("Заощадження",       .savings, 18000, "#818cf8", "lock.shield", 2)
         ]
+        // Назви рахунків локалізуються за поточною мовою на момент сіду.
         for (name, type, balance, color, icon, order) in accounts {
-            context.insert(Account(name: name, type: type, balance: balance, color: color, icon: icon, order: order))
+            let localizedName = L(name)
+            context.insert(Account(name: localizedName, type: type, balance: balance, color: color, icon: icon, order: order))
         }
-        try? context.save()
     }
 }
+
+
