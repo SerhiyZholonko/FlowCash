@@ -24,9 +24,13 @@ struct AddTransactionView: View {
                 saveButton
             }
         }
-        .onAppear { viewModel.loadCategories() }
+        .onAppear {
+            viewModel.loadCategories()
+            viewModel.loadAccounts()
+        }
         .sheet(isPresented: $viewModel.isShowingNoteInput) { noteSheet }
         .sheet(isPresented: $viewModel.isShowingDatePicker) { dateSheet }
+        .sheet(isPresented: $viewModel.isShowingAccountPicker) { accountSheet }
         .sheet(isPresented: $viewModel.isAddingCategory) { addCategorySheet }
         .alert("Помилка", isPresented: Binding(
             get: { viewModel.error != nil },
@@ -84,6 +88,13 @@ struct AddTransactionView: View {
 
     private var chipsRow: some View {
         HStack(spacing: 8) {
+            chipButton(
+                icon: "creditcard",
+                label: viewModel.selectedAccount?.name ?? L("Рахунок")
+            ) {
+                viewModel.isShowingAccountPicker = true
+            }
+
             chipButton(
                 icon: "mic",
                 label: viewModel.note.isEmpty ? L("Нотатка") : viewModel.note
@@ -241,6 +252,27 @@ struct AddTransactionView: View {
     // MARK: - Save button
 
     private var saveButton: some View {
+        VStack(spacing: 8) {
+            if viewModel.selectedAccount == nil {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 13))
+                    Text("Оберіть рахунок")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(Color.expenseRed)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color.expenseRed.opacity(0.12), in: Capsule())
+            }
+            saveButtonBody
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 24)
+    }
+
+    private var saveButtonBody: some View {
         Button {
             Task { [weak viewModel] in
                 guard let viewModel, viewModel.isValid else { return }
@@ -260,9 +292,6 @@ struct AddTransactionView: View {
                 )
         }
         .disabled(!viewModel.isValid)
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 24)
     }
 
     // MARK: - Add category sheet
@@ -354,6 +383,83 @@ struct AddTransactionView: View {
                     .foregroundStyle(.white)
             }
             .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Account sheet
+
+    private var accountSheet: some View {
+        NavigationStack {
+            Group {
+                if viewModel.accounts.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "creditcard")
+                            .font(.system(size: 32))
+                            .foregroundStyle(Color.textSecondary)
+                        Text("Немає рахунків")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.textPrimary)
+                        Text("Спочатку додайте рахунок у налаштуваннях.")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            ForEach(viewModel.accounts, id: \.id) { account in
+                                accountRow(account)
+                            }
+                        }
+                        .padding(20)
+                    }
+                }
+            }
+            .background(Color.bgPrimary)
+            .navigationTitle("Рахунок")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Готово") { viewModel.isShowingAccountPicker = false }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.accentPrimary)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func accountRow(_ account: Account) -> some View {
+        let isSelected = viewModel.selectedAccount?.id == account.id
+        return Button {
+            viewModel.selectedAccount = account
+            viewModel.isShowingAccountPicker = false
+        } label: {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(Color(hex: account.color))
+                    .frame(width: 40, height: 40)
+                    .overlay {
+                        Image(systemName: account.icon)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                Text(account.name)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.accentPrimary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Date sheet

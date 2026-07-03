@@ -10,10 +10,13 @@ final class AddTransactionViewModel: ErrorDisplayable, AlertDisplayable {
     var date: Date = .now
     var categories: [Category] = []
     var selectedCategory: Category?
+    var accounts: [Account] = []
+    var selectedAccount: Account?
     var error: Error?
     var alert: AppAlert?
     var isShowingDatePicker = false
     var isShowingNoteInput = false
+    var isShowingAccountPicker = false
 
     var isAddingCategory = false
     var newCategoryName = ""
@@ -42,7 +45,7 @@ final class AddTransactionViewModel: ErrorDisplayable, AlertDisplayable {
     @Injected(\.dataStore) private var store
 
     var amountValue: Double { Double(amountString) ?? 0 }
-    var isValid: Bool { amountValue > 0 }
+    var isValid: Bool { amountValue > 0 && selectedAccount != nil }
 
     var displayAmount: String {
         amountString == "0" ? "0" : amountString
@@ -98,6 +101,19 @@ final class AddTransactionViewModel: ErrorDisplayable, AlertDisplayable {
         }
     }
 
+    func loadAccounts() {
+        Task(handlingError: self) { [weak self] in
+            guard let self else { return }
+            let all = try await store.fetchAccounts()
+            accounts = all
+            guard selectedAccount == nil else { return }
+            // Резолвимо як головний екран: активний рахунок, інакше перший.
+            let storedId = UserDefaults.standard.string(forKey: AccountSelection.key)
+                .flatMap { UUID(uuidString: $0) }
+            selectedAccount = all.first { $0.id == storedId } ?? all.first
+        }
+    }
+
     func addCategory() {
         let name = newCategoryName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
@@ -121,8 +137,7 @@ final class AddTransactionViewModel: ErrorDisplayable, AlertDisplayable {
     }
 
     func save() async throws {
-        let accounts = try await store.fetchAccounts()
-        let account = resolveSelectedAccount(accounts)
+        guard let account = selectedAccount else { return }
 
         let transaction = Transaction(
             amount: amountValue,
@@ -134,19 +149,8 @@ final class AddTransactionViewModel: ErrorDisplayable, AlertDisplayable {
         transaction.account = account
         try await store.add(transaction)
 
-        if let account {
-            account.balance += transaction.signedAmount
-            try await store.update(account)
-        }
-    }
-
-    private func resolveSelectedAccount(_ accounts: [Account]) -> Account? {
-        if let stored = UserDefaults.standard.string(forKey: AccountSelection.key),
-           let id = UUID(uuidString: stored),
-           let match = accounts.first(where: { $0.id == id }) {
-            return match
-        }
-        return accounts.first
+        account.balance += transaction.signedAmount
+        try await store.update(account)
     }
 }
 

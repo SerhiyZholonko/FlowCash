@@ -205,6 +205,17 @@
 			knownRegions = (
 				en,
 				uk,
+				de,
+				es,
+				it,
+				ms,
+				"pt-BR",
+				"zh-Hans",
+				tr,
+				pl,
+				hr,
+				nb,
+				fr,
 				Base,
 			);
 			mainGroup = 18C5CC822FC4173E00515310;

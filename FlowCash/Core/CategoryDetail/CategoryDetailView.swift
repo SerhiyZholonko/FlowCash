@@ -1,9 +1,20 @@
 import SwiftUI
+import SwiftData
 import Charts
 
 struct CategoryDetailView: View {
     @State private var viewModel: CategoryDetailViewModel
     @Environment(\.dismiss) private var dismiss
+
+    // Після збереження редагування виходимо з екрана деталей — свіжо завантажений
+    // список гарантовано коректний (на відміну від оновлення поточного екрана).
+    @State private var popAfterEdit = false
+
+    // @Query спостерігає за контекстом і сам оновлюється при кожній зміні
+    // (локальне збереження або доміровані CloudKit-зміни), тож редагована
+    // транзакція не «зникає» зі списку до повторного відкриття екрана.
+    @Query(sort: [SortDescriptor(\Transaction.date, order: .reverse)])
+    private var allTransactions: [Transaction]
 
     init(stat: CategoryStat) {
         _viewModel = State(initialValue: CategoryDetailViewModel(stat: stat))
@@ -28,9 +39,16 @@ struct CategoryDetailView: View {
                     .foregroundStyle(Color(hex: viewModel.stat.color))
             }
         }
-        .onAppear { viewModel.loadData() }
-        .sheet(item: $viewModel.editingTransaction, onDismiss: { viewModel.loadData() }) { transaction in
-            EditTransactionView(transaction: transaction) { viewModel.loadData() }
+        .onChange(of: allTransactions, initial: true) { _, transactions in
+            viewModel.transactions = transactions
+        }
+        .sheet(item: $viewModel.editingTransaction, onDismiss: {
+            if popAfterEdit {
+                popAfterEdit = false
+                dismiss()
+            }
+        }) { transaction in
+            EditTransactionView(transaction: transaction) { popAfterEdit = true }
         }
         .alert("Помилка", isPresented: Binding(
             get: { viewModel.error != nil },
@@ -162,4 +180,5 @@ private extension Date {
         ))
     }
     .injectMockStore()
+    .modelContainer(for: [Transaction.self, Category.self, Account.self, Budget.self], inMemory: true)
 }

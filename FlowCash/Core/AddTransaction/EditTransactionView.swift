@@ -19,6 +19,7 @@ struct EditTransactionView: View {
                 VStack(spacing: 16) {
                     amountCard
                     typeCard
+                    accountCard
                     categoryCard
                     detailsCard
                     deleteButton
@@ -66,10 +67,14 @@ struct EditTransactionView: View {
                     .disabled(!viewModel.isValid)
                 }
             }
-            .onAppear { viewModel.loadCategories() }
+            .onAppear {
+                viewModel.loadCategories()
+                viewModel.loadAccounts()
+            }
             .onChange(of: viewModel.selectedType) { _, _ in
                 viewModel.typeChanged()
             }
+            .sheet(isPresented: $viewModel.isShowingAccountPicker) { accountSheet }
             .alert("Помилка", isPresented: Binding(
                 get: { viewModel.error != nil },
                 set: { _ in viewModel.error = nil }
@@ -148,6 +153,110 @@ struct EditTransactionView: View {
         .padding(16)
         .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+    }
+
+    // MARK: - Account
+
+    private var accountCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionLabel("РАХУНОК")
+            Button {
+                viewModel.isShowingAccountPicker = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "creditcard")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.textSecondary)
+                    Text(viewModel.selectedAccount?.name ?? L("Оберіть рахунок"))
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(viewModel.selectedAccount == nil ? Color.expenseRed : Color.textPrimary)
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+    }
+
+    private var accountSheet: some View {
+        NavigationStack {
+            Group {
+                if viewModel.accounts.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "creditcard")
+                            .font(.system(size: 32))
+                            .foregroundStyle(Color.textSecondary)
+                        Text("Немає рахунків")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.textPrimary)
+                        Text("Спочатку додайте рахунок у налаштуваннях.")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            ForEach(viewModel.accounts, id: \.id) { account in
+                                accountRow(account)
+                            }
+                        }
+                        .padding(20)
+                    }
+                }
+            }
+            .background(Color.bgPrimary)
+            .navigationTitle("Рахунок")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Готово") { viewModel.isShowingAccountPicker = false }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.accentPrimary)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func accountRow(_ account: Account) -> some View {
+        let isSelected = viewModel.selectedAccount?.id == account.id
+        return Button {
+            viewModel.selectedAccount = account
+            viewModel.isShowingAccountPicker = false
+        } label: {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(Color(hex: account.color))
+                    .frame(width: 40, height: 40)
+                    .overlay {
+                        Image(systemName: account.icon)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                Text(account.name)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.accentPrimary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Category

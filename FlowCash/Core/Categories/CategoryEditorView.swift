@@ -11,9 +11,9 @@ struct CategoryEditorView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    typePicker
                     hintLabel
-                    categorySection(title: L("Витрати"), categories: viewModel.expenseCategories)
-                    categorySection(title: L("Дохід"), categories: viewModel.incomeCategories)
+                    categoryGrid(viewModel.visibleCategories)
                     newCategoryCard
                         .id("newCategory")
                 }
@@ -57,13 +57,8 @@ struct CategoryEditorView: View {
 
     // MARK: - Category grid
 
-    private func categorySection(title: String, categories: [Category]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title.uppercased())
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Color.textPrimary)
-                .tracking(0.6)
-
+    private func categoryGrid(_ categories: [Category]) -> some View {
+        Group {
             if categories.isEmpty {
                 Text("Поки немає категорій")
                     .font(.system(size: 13))
@@ -76,6 +71,7 @@ struct CategoryEditorView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func categoryTile(_ category: Category) -> some View {
@@ -119,8 +115,6 @@ struct CategoryEditorView: View {
             Text("Нова категорія")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.textPrimary)
-
-            typePicker
 
             TextField("Назва категорії", text: $viewModel.newCategoryName)
                 .font(.system(size: 14))

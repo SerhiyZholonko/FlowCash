@@ -7,10 +7,14 @@ private var bundleAssociationKey: UInt8 = 0
 /// Підклас Bundle, що перенаправляє пошук локалізованих рядків у вибрану `.lproj`.
 private final class LocalizedBundle: Bundle, @unchecked Sendable {
     override func localizedString(forKey key: String, value: String?, table tableName: String?) -> String {
-        guard let bundle = objc_getAssociatedObject(self, &bundleAssociationKey) as? Bundle else {
-            return super.localizedString(forKey: key, value: value, table: tableName)
+        if let bundle = objc_getAssociatedObject(self, &bundleAssociationKey) as? Bundle {
+            return bundle.localizedString(forKey: key, value: value, table: tableName)
         }
-        return bundle.localizedString(forKey: key, value: value, table: tableName)
+        // Для обраної мови немає `.lproj` (це source-мова `uk`, ключі вже українські).
+        // Повертаємо сам ключ, а НЕ `super` — інакше система резолвить рядок за
+        // глобальною мовою телефону й бере чужий переклад із її `.lproj`.
+        if let value, !value.isEmpty { return value }
+        return key
     }
 }
 

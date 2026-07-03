@@ -58,13 +58,6 @@ final class CategoryDetailViewModel: ErrorDisplayable, AlertDisplayable {
 
     var maxBarTotal: Double { monthlyBars.map(\.total).max() ?? 1 }
 
-    func loadData() {
-        Task(handlingError: self) { [weak self] in
-            guard let self else { return }
-            transactions = try await store.fetchTransactions()
-        }
-    }
-
     func delete(_ transaction: Transaction) {
         Task(handlingError: self) { [weak self] in
             guard let self else { return }

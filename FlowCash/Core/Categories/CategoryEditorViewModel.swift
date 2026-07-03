@@ -13,12 +13,10 @@ final class CategoryEditorViewModel: ErrorDisplayable, AlertDisplayable {
     var error: Error?
     var alert: AppAlert?
 
-    var expenseCategories: [Category] {
-        categories.filter { $0.type == .expense }
-    }
-
-    var incomeCategories: [Category] {
-        categories.filter { $0.type == .income }
+    /// Категорії обраного типу — керується верхнім Picker'ом (newCategoryType),
+    /// який водночас задає тип для нової категорії.
+    var visibleCategories: [Category] {
+        categories.filter { $0.type == newCategoryType }
     }
 
     let colorSwatches: [String] = [
